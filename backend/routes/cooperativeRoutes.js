@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import Cooperative from "../models/Cooperative.js";
 import Worker from "../models/Worker.js";
 import LedgerTransaction from "../models/LedgerTransaction.js";
@@ -43,7 +43,7 @@ router.patch("/verify-worker/:workerId", protect, authorize("coopAdmin"), async 
     }
 
     worker.verified = req.body.verified !== undefined ? req.body.verified : true;
-    worker.trustScore = Math.min(100, worker.trustScore + 15); // verification boosts trust score
+    worker.trustScore = Math.min(100, worker.trustScore + 15);
     await worker.save();
 
     res.json(worker);
@@ -53,8 +53,6 @@ router.patch("/verify-worker/:workerId", protect, authorize("coopAdmin"), async 
 });
 
 // PATCH /api/cooperatives/verify-id/:workerId  (coopAdmin confirms Aadhaar ID match)
-// This is a manual confirmation step, not a live UIDAI API check — the admin
-// checks the worker's physical Aadhaar card against the last-4-digits on file.
 router.patch("/verify-id/:workerId", protect, authorize("coopAdmin"), async (req, res) => {
   try {
     const worker = await Worker.findById(req.params.workerId);
@@ -89,12 +87,13 @@ router.get("/ledger", protect, authorize("coopAdmin"), async (req, res) => {
     const totals = transactions.reduce(
       (acc, t) => {
         acc.grossAmount += t.grossAmount;
-        acc.platformFee += t.platformFee;
+        acc.feePool += t.feePool;
         acc.welfareFundContribution += t.welfareFundContribution;
+        acc.workerFeeShare += t.workerFeeShare;
         acc.workerPayout += t.workerPayout;
         return acc;
       },
-      { grossAmount: 0, platformFee: 0, welfareFundContribution: 0, workerPayout: 0 }
+      { grossAmount: 0, feePool: 0, welfareFundContribution: 0, workerFeeShare: 0, workerPayout: 0 }
     );
 
     res.json({ cooperative: coop, transactions, totals });

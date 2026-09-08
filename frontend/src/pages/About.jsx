@@ -11,7 +11,7 @@ export default function About() {
         <p>
           Unlike typical gig platforms that quietly take 25–40% commission, CoopServe shows a
           <strong> Transparent Commission Ledger</strong> for every single booking: exactly how much the
-          worker receives, how much goes to platform upkeep, and how much goes into the cooperative's
+          worker receives, and how much goes into the cooperative's
           community welfare fund — used for worker insurance and emergency support.
         </p>
         <p>

@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import LedgerTransaction from "../models/LedgerTransaction.js";
 import Worker from "../models/Worker.js";
 import { protect, authorize } from "../middleware/auth.js";
@@ -18,11 +18,38 @@ router.get("/mine", protect, authorize("worker"), async (req, res) => {
     const totals = transactions.reduce(
       (acc, t) => {
         acc.grossAmount += t.grossAmount;
-        acc.platformFee += t.platformFee;
+        acc.welfareFundContribution += t.welfareFundContribution;
+        acc.workerFeeShare += t.workerFeeShare;
         acc.workerPayout += t.workerPayout;
         return acc;
       },
-      { grossAmount: 0, platformFee: 0, workerPayout: 0 }
+      { grossAmount: 0, welfareFundContribution: 0, workerFeeShare: 0, workerPayout: 0 }
+    );
+
+    res.json({ transactions, totals });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/ledger/worker/:workerId  (used by WorkerProfile and WorkerPerformanceChart)
+router.get("/worker/:workerId", protect, async (req, res) => {
+  try {
+    const { workerId } = req.params;
+
+    const transactions = await LedgerTransaction.find({ workerId })
+      .populate("bookingId", "category scheduledAt address")
+      .sort({ createdAt: -1 });
+
+    const totals = transactions.reduce(
+      (acc, t) => {
+        acc.grossAmount += t.grossAmount;
+        acc.welfareFundContribution += t.welfareFundContribution;
+        acc.workerFeeShare += t.workerFeeShare;
+        acc.workerPayout += t.workerPayout;
+        return acc;
+      },
+      { grossAmount: 0, welfareFundContribution: 0, workerFeeShare: 0, workerPayout: 0 }
     );
 
     res.json({ transactions, totals });

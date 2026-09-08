@@ -102,7 +102,7 @@ async function seed() {
       passwordHash,
       role: "customer",
       phone: `98100000${i}0`,
-      address: `${i}, Model Town, Darbhanga, Bihar`,
+      address: `${i}, Main Road, Ranchi, Jharkhand`,
     });
     customers.push(c);
   }
@@ -113,10 +113,9 @@ async function seed() {
     const category = CATEGORIES[i % CATEGORIES.length].name;
     const coop = cooperatives[i % cooperatives.length];
     const skills = SKILLS_BY_CATEGORY[category];
-    const isPatna = i % 2 === 0;
-    // Patna ~ 25.5941, 85.1376 | Darbhanga ~ 26.1542, 85.8918 — small random offset per worker
-    const baseLat = isPatna ? 25.5941 : 26.1542;
-    const baseLng = isPatna ? 85.1376 : 85.8918;
+    const isRanchi = i % 2 === 0;
+    const baseLat = isRanchi ? 23.3495 : 26.1542;
+    const baseLng = isRanchi ? 85.3340 : 85.8918;
 
     const wUser = await User.create({
       name: WORKER_NAMES[i],
@@ -124,7 +123,7 @@ async function seed() {
       passwordHash,
       role: "worker",
       phone: `97000000${String(i).padStart(2, "0")}`,
-      address: `${i + 1} Ward, ${isPatna ? "Patna" : "Darbhanga"}, Bihar`,
+      address: `${i + 1} Ward, ${isRanchi ? "Ranchi" : "Main Road"}, Jharkhand`,
       photoUrl: `https://i.pravatar.cc/150?img=${(i % 70) + 1}`,
       location: { lat: baseLat + (Math.random() - 0.5) * 0.08, lng: baseLng + (Math.random() - 0.5) * 0.08 },
     });
@@ -137,9 +136,9 @@ async function seed() {
       skills: skills.slice(0, 3),
       priceRange: { min: 150, max: 600 },
       bio: `Experienced ${category.toLowerCase()} professional with ${2 + (i % 8)} years of service in the community.`,
-      verified: i % 4 !== 0, // most verified, a few pending (for the admin demo screen)
-      aadharLast4: i % 3 !== 2 ? String(1000 + i * 137).slice(-4) : "", // most have submitted Aadhaar
-      idVerified: i % 3 === 0, // some fully ID-confirmed, some pending admin confirmation (for the demo)
+      verified: i % 4 !== 0,
+      aadharLast4: i % 3 !== 2 ? String(1000 + i * 137).slice(-4) : "",
+      idVerified: i % 3 === 0,
       trustScore: 55 + Math.round(Math.random() * 40),
       avgRating,
       totalRatings: 5 + (i % 10),
@@ -178,7 +177,6 @@ async function seed() {
       completedAt: new Date(Date.now() - (daysAgo - 1) * 24 * 60 * 60 * 1000),
     });
 
-    // Track most recent booking date per worker to set a realistic lastMatchedAt
     worker.lastMatchedAt = booking.scheduledAt;
     await worker.save();
 
@@ -191,18 +189,23 @@ async function seed() {
       comment: sampleComments[i % sampleComments.length],
     });
 
+    // --- No platform fee anywhere. The cooperative's fee pool (10% of the
+    // job) is 100% redistributed: part to the welfare fund (society), the
+    // rest returned directly to the worker as a bonus on top of base pay. ---
     const coop = cooperatives.find((c) => String(c._id) === String(worker.cooperativeId));
-    const platformFee = Math.round(amount * coop.commissionRate * 100) / 100;
-    const welfareFundContribution = Math.round(platformFee * coop.welfareShare * 100) / 100;
-    const workerPayout = Math.round((amount - platformFee) * 100) / 100;
+    const feePool = Math.round(amount * coop.commissionRate * 100) / 100;
+    const welfareFundContribution = Math.round(feePool * coop.welfareShare * 100) / 100;
+    const workerFeeShare = Math.round((feePool - welfareFundContribution) * 100) / 100;
+    const workerPayout = Math.round((amount - welfareFundContribution) * 100) / 100;
 
     await LedgerTransaction.create({
       bookingId: booking._id,
       workerId: worker._id,
       cooperativeId: coop._id,
       grossAmount: amount,
-      platformFee,
+      feePool,
       welfareFundContribution,
+      workerFeeShare,
       workerPayout,
     });
 
@@ -230,8 +233,8 @@ async function seed() {
   console.log("\n✅ Seed complete!\n");
   console.log("Demo login credentials (password for all: Demo@1234):");
   console.log("  Cooperative Admin: admin1@coopserve.demo / admin2@coopserve.demo");
-  console.log("  Customer:          customer1@coopserve.demo (through customer4)");
-  console.log("  Worker:            worker1@coopserve.demo (through worker14)");
+  console.log("  Customer: customer1@coopserve.demo (through customer4)");
+  console.log("  Worker: worker1@coopserve.demo (through worker14)");
 
   process.exit(0);
 }

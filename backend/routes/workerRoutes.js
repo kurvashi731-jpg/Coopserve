@@ -15,8 +15,8 @@ function distanceKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const RADIUS_STEPS_KM = [5, 15, 50, 150]; // auto-expand if too few workers found nearby
-
+// To this (strict 5 km limit):
+const RADIUS_STEPS_KM = [5];
 // GET /api/workers?category=Plumbing&minRating=4&lat=25.6&lng=85.1&sortMode=fair
 // sortMode: "fair" (default, rotation-based) | "rating" | "distance"
 router.get("/", async (req, res) => {

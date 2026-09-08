@@ -1,14 +1,19 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import api from "../api/axios";
 import LedgerRow from "../components/LedgerRow";
 
 export default function WorkerEarnings() {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    api.get("/ledger/mine").then((res) => setData(res.data));
+    api
+      .get("/ledger/mine")
+      .then((res) => setData(res.data))
+      .catch(() => setError(true));
   }, []);
 
+  if (error) return <div className="max-w-2xl mx-auto px-4 py-10 text-red-500">Couldn't load your earnings. Try refreshing.</div>;
   if (!data) return <div className="max-w-2xl mx-auto px-4 py-10 text-slate-400">Loading...</div>;
 
   const { transactions, totals } = data;
@@ -28,8 +33,8 @@ export default function WorkerEarnings() {
           <p className="font-heading font-bold text-lg text-primary">₹{totals.workerPayout}</p>
         </div>
         <div className="card text-center !p-4">
-          <p className="text-xs text-slate-400">Cooperative Fee</p>
-          <p className="font-heading font-bold text-lg text-accent">₹{totals.platformFee}</p>
+          <p className="text-xs text-slate-400">Welfare Fund</p>
+          <p className="font-heading font-bold text-lg text-accent">₹{totals.welfareFundContribution}</p>
         </div>
       </div>
 

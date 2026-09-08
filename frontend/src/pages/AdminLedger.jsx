@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import api from "../api/axios";
 import LedgerRow from "../components/LedgerRow";
 
@@ -30,8 +30,8 @@ export default function AdminLedger() {
           <p className="font-heading font-bold text-lg text-primary">₹{totals.workerPayout.toFixed(0)}</p>
         </div>
         <div className="card text-center !p-4">
-          <p className="text-xs text-slate-400">Platform Fee</p>
-          <p className="font-heading font-bold text-lg text-accent">₹{totals.platformFee.toFixed(0)}</p>
+          <p className="text-xs text-slate-400">Worker Fee Bonus</p>
+          <p className="font-heading font-bold text-lg text-accent">₹{totals.workerFeeShare.toFixed(0)}</p>
         </div>
         <div className="card text-center !p-4">
           <p className="text-xs text-slate-400">Welfare Fund</p>

@@ -104,19 +104,24 @@ router.patch("/:id/status", protect, authorize("worker"), async (req, res) => {
       booking.completedAt = new Date();
 
       // --- Transparent Commission Ledger generation ---
+      // No cut is retained by the platform. The cooperative fee pool is fully
+      // redistributed: part to the welfare fund (society), and the rest
+      // returned directly to the worker as a bonus on top of their base pay.
       const coop = await Cooperative.findById(worker.cooperativeId);
       const grossAmount = booking.amount;
-      const platformFee = Math.round(grossAmount * coop.commissionRate * 100) / 100;
-      const welfareFundContribution = Math.round(platformFee * coop.welfareShare * 100) / 100;
-      const workerPayout = Math.round((grossAmount - platformFee) * 100) / 100;
+      const feePool = Math.round(grossAmount * coop.commissionRate * 100) / 100;
+      const welfareFundContribution = Math.round(feePool * coop.welfareShare * 100) / 100;
+      const workerFeeShare = Math.round((feePool - welfareFundContribution) * 100) / 100;
+      const workerPayout = Math.round((grossAmount - welfareFundContribution) * 100) / 100;
 
       await LedgerTransaction.create({
         bookingId: booking._id,
         workerId: worker._id,
         cooperativeId: coop._id,
         grossAmount,
-        platformFee,
+        feePool,
         welfareFundContribution,
+        workerFeeShare,
         workerPayout,
       });
 
