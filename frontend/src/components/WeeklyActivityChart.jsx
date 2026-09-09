@@ -10,7 +10,7 @@ export default function WeeklyActivityChart({ workerId }) {
     
     // Fetch bookings to compute live weekly metrics
     api.get(`/bookings/worker-jobs`)
-      .then((res) => {
+    .then((res) => {
         const bookings = res.data || [];
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
