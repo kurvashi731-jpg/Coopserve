@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Repeat, Briefcase } from "lucide-react";
 import api from "../api/axios";
 import { VerifiedBadge, TrustScoreBadge, IdVerifiedBadge } from "../components/Badge";
+import WorkloadChart from "../components/WorkloadChart";
 
 const STATUS_COLORS = {
   requested: "bg-amber-100 text-amber-700",
@@ -19,15 +20,31 @@ export default function WorkerDashboard() {
   const [loading, setLoading] = useState(true);
   const [aadhar, setAadhar] = useState("");
   const [submittingAadhar, setSubmittingAadhar] = useState(false);
+  const [cooperatives, setCooperatives] = useState([]);
+  const [switchTarget, setSwitchTarget] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const [portfolio, setPortfolio] = useState({ experienceYears: "", portfolioNote: "" });
+  const [savingPortfolio, setSavingPortfolio] = useState(false);
 
-  const loadProfile = () => api.get("/workers/me/profile").then((res) => setProfile(res.data));
+  const loadProfile = () =>
+    api.get("/workers/me/profile").then((res) => {
+      setProfile(res.data);
+      setPortfolio({
+        experienceYears: res.data.experienceYears || "",
+        portfolioNote: res.data.portfolioNote || "",
+      });
+    });
 
   useEffect(() => {
-    Promise.all([api.get("/workers/me/profile"), api.get("/bookings/worker-jobs")]).then(([p, j]) => {
-      setProfile(p.data);
-      setJobs(j.data);
-      setLoading(false);
-    });
+    Promise.all([api.get("/workers/me/profile"), api.get("/bookings/worker-jobs"), api.get("/cooperatives")]).then(
+      ([p, j, c]) => {
+        setProfile(p.data);
+        setPortfolio({ experienceYears: p.data.experienceYears || "", portfolioNote: p.data.portfolioNote || "" });
+        setJobs(j.data);
+        setCooperatives(c.data);
+        setLoading(false);
+      }
+    );
   }, []);
 
   const submitAadhar = async (e) => {
@@ -42,6 +59,37 @@ export default function WorkerDashboard() {
       toast.error(err.response?.data?.message || "Could not submit Aadhaar");
     } finally {
       setSubmittingAadhar(false);
+    }
+  };
+
+  const switchCooperative = async () => {
+    if (!switchTarget) return;
+    setSwitching(true);
+    try {
+      const { data } = await api.patch("/workers/me/switch-cooperative", { cooperativeId: switchTarget });
+      toast.success(data.message);
+      setSwitchTarget("");
+      loadProfile();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not switch cooperative");
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const savePortfolio = async (e) => {
+    e.preventDefault();
+    setSavingPortfolio(true);
+    try {
+      await api.patch("/workers/me/update", {
+        experienceYears: Number(portfolio.experienceYears) || 0,
+        portfolioNote: portfolio.portfolioNote,
+      });
+      toast.success("Portfolio updated");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not save portfolio");
+    } finally {
+      setSavingPortfolio(false);
     }
   };
 
@@ -96,6 +144,55 @@ export default function WorkerDashboard() {
           </form>
         </div>
       )}
+
+      <div className="mb-5">
+        <WorkloadChart />
+      </div>
+
+      <div className="card mb-5">
+        <h2 className="font-heading font-semibold mb-1 flex items-center gap-2">
+          <Repeat size={18} className="text-primary" /> Switch Cooperative
+        </h2>
+        <p className="text-xs text-slate-500 mb-3">
+          Your trust score, ratings, job history, and past earnings stay with you — only the "Coop Verified" badge
+          resets, since your new cooperative will confirm your membership fresh.
+        </p>
+        <div className="flex gap-2">
+          <select className="input flex-1" value={switchTarget} onChange={(e) => setSwitchTarget(e.target.value)}>
+            <option value="">Select a cooperative to join</option>
+            {cooperatives
+              .filter((c) => c._id !== profile?.cooperativeId?._id)
+              .map((c) => (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              ))}
+          </select>
+          <button onClick={switchCooperative} disabled={!switchTarget || switching} className="btn-primary whitespace-nowrap">
+            {switching ? "Moving..." : "Switch"}
+          </button>
+        </div>
+      </div>
+
+      <div className="card mb-5">
+        <h2 className="font-heading font-semibold mb-1 flex items-center gap-2">
+          <Briefcase size={18} className="text-primary" /> Experience &amp; Portfolio
+        </h2>
+        <p className="text-xs text-slate-500 mb-3">Shown on your public profile so customers can see your background.</p>
+        <form onSubmit={savePortfolio} className="space-y-3">
+          <input
+            type="number" min={0} placeholder="Years of experience" className="input"
+            value={portfolio.experienceYears}
+            onChange={(e) => setPortfolio({ ...portfolio, experienceYears: e.target.value })}
+          />
+          <textarea
+            className="input" rows={3} placeholder="Describe past projects, specialties, notable work..."
+            value={portfolio.portfolioNote}
+            onChange={(e) => setPortfolio({ ...portfolio, portfolioNote: e.target.value })}
+          />
+          <button type="submit" disabled={savingPortfolio} className="btn-primary w-full">
+            {savingPortfolio ? "Saving..." : "Save Portfolio"}
+          </button>
+        </form>
+      </div>
 
       <h2 className="font-heading font-semibold mb-3">Active Jobs ({activeJobs.length})</h2>
       {loading ? (

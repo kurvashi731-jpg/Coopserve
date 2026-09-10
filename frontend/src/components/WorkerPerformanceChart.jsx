@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import api from "../api/axios";
 
 export default function WorkerPerformanceChart({ workerId }) {
@@ -32,7 +32,7 @@ export default function WorkerPerformanceChart({ workerId }) {
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-slate-400">
-              <th className="pb-1.5 font-medium">Ref</th>
+              <th className="pb-1.5 font-medium">Work</th>
               <th className="pb-1.5 font-medium text-right">Gross</th>
               <th className="pb-1.5 font-medium text-right">Payout</th>
             </tr>
@@ -45,8 +45,11 @@ export default function WorkerPerformanceChart({ workerId }) {
             ) : (
               transactions.map((tx) => (
                 <tr key={tx._id}>
-                  <td className="py-2 font-medium text-slate-800">#{tx._id.slice(-6).toUpperCase()}</td>
-                  <td className="py-2 text-right font-semibold">₹{tx.grossAmount || tx.workerPayout}</td>
+                  <td className="py-2">
+                    <p className="font-medium text-slate-800">{tx.bookingId?.category || "Service"}</p>
+                    <p className="text-[10px] text-slate-400">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                  </td>
+                  <td className="py-2 text-right font-semibold">₹{tx.grossAmount}</td>
                   <td className="py-2 text-right font-semibold text-emerald-600">₹{tx.workerPayout}</td>
                 </tr>
               ))

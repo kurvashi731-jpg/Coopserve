@@ -144,6 +144,17 @@ export default function WorkerProfile() {
       <div className="card">
         <h2 className="font-heading font-semibold mb-2">About</h2>
         <p className="text-sm text-slate-600 mb-3">{worker.bio}</p>
+        {worker.experienceYears > 0 && (
+          <p className="text-sm text-slate-600 mb-2">
+            <span className="font-medium text-slate-700">{worker.experienceYears} years</span> of experience
+          </p>
+        )}
+        {worker.portfolioNote && (
+          <div className="bg-slate-50 rounded-xl p-3 mb-3">
+            <p className="text-xs font-medium text-slate-500 mb-1">Portfolio</p>
+            <p className="text-sm text-slate-600">{worker.portfolioNote}</p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 mb-3">
           {worker.skills?.map((s) => (
             <span key={s} className="bg-slate-100 text-slate-600 text-xs px-3 py-1 rounded-full">{s}</span>

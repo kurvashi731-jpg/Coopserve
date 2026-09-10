@@ -1,10 +1,10 @@
-import express from "express";
+﻿import express from "express";
 import Worker from "../models/Worker.js";
+import Cooperative from "../models/Cooperative.js";
 import { protect, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Haversine formula - distance in km between two lat/lng points
 function distanceKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -15,10 +15,8 @@ function distanceKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// To this (strict 5 km limit):
-const RADIUS_STEPS_KM = [5];
-// GET /api/workers?category=Plumbing&minRating=4&lat=25.6&lng=85.1&sortMode=fair
-// sortMode: "fair" (default, rotation-based) | "rating" | "distance"
+const RADIUS_STEPS_KM = [5, 15, 50, 150];
+
 router.get("/", async (req, res) => {
   try {
     const { category, minRating, search, lat, lng, sortMode = "fair" } = req.query;
@@ -46,7 +44,6 @@ router.get("/", async (req, res) => {
       const customerLat = Number(lat);
       const customerLng = Number(lng);
 
-      // Attach distance to every worker that has a saved location
       let withDistance = workers.map((w) => {
         const wObj = w.toObject();
         if (w.userId?.location?.lat != null && w.userId?.location?.lng != null) {
@@ -67,9 +64,6 @@ router.get("/", async (req, res) => {
       } else if (sortMode === "rating") {
         workers = withDistance.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
       } else {
-        // FAIR ROTATION: find the smallest radius step that returns at least
-        // one worker, so nearby matching stays local when possible but never
-        // returns an empty result in low worker-density areas.
         let radiusUsed = RADIUS_STEPS_KM[RADIUS_STEPS_KM.length - 1];
         let nearby = withDistance.filter((w) => w.distanceKm != null && w.distanceKm <= radiusUsed);
 
@@ -82,15 +76,13 @@ router.get("/", async (req, res) => {
           }
         }
 
-        // Workers with no saved location at all can't be radius-filtered — include
-        // them at the end so they're still visible, just not rotation-prioritized.
         const noLocation = withDistance.filter((w) => w.distanceKm == null);
 
         nearby.sort((a, b) => {
-          const aTime = a.lastMatchedAt ? new Date(a.lastMatchedAt).getTime() : 0; // never matched = 0 = goes first
+          const aTime = a.lastMatchedAt ? new Date(a.lastMatchedAt).getTime() : 0;
           const bTime = b.lastMatchedAt ? new Date(b.lastMatchedAt).getTime() : 0;
-          if (aTime !== bTime) return aTime - bTime; // longest since last job first
-          return a.distanceKm - b.distanceKm; // tiebreaker: closer first
+          if (aTime !== bTime) return aTime - bTime;
+          return a.distanceKm - b.distanceKm;
         });
 
         workers = [...nearby, ...noLocation];
@@ -104,7 +96,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /api/workers/:id  (public profile)
 router.get("/:id", async (req, res) => {
   try {
     const worker = await Worker.findById(req.params.id)
@@ -117,18 +108,19 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// PATCH /api/workers/me  (worker edits own profile)
 router.patch("/me/update", protect, authorize("worker"), async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.id });
     if (!worker) return res.status(404).json({ message: "Worker profile not found" });
 
-    const { category, skills, priceRange, bio, available } = req.body;
+    const { category, skills, priceRange, bio, available, experienceYears, portfolioNote } = req.body;
     if (category) worker.category = category;
     if (skills) worker.skills = skills;
     if (priceRange) worker.priceRange = priceRange;
     if (bio !== undefined) worker.bio = bio;
     if (available !== undefined) worker.available = available;
+    if (experienceYears !== undefined) worker.experienceYears = experienceYears;
+    if (portfolioNote !== undefined) worker.portfolioNote = portfolioNote;
 
     await worker.save();
     res.json(worker);
@@ -137,10 +129,40 @@ router.patch("/me/update", protect, authorize("worker"), async (req, res) => {
   }
 });
 
-// PATCH /api/workers/me/aadhar  (worker submits Aadhaar for ID verification)
-// SECURITY: the full number is received here but never saved to the database —
-// only the last 4 digits are persisted, and idVerified is reset to false so an
-// admin has to manually re-confirm any time the number is changed.
+router.patch("/me/switch-cooperative", protect, authorize("worker"), async (req, res) => {
+  try {
+    const { cooperativeId } = req.body;
+    if (!cooperativeId) return res.status(400).json({ message: "cooperativeId is required" });
+
+    const worker = await Worker.findOne({ userId: req.user.id });
+    if (!worker) return res.status(404).json({ message: "Worker profile not found" });
+
+    const newCoop = await Cooperative.findById(cooperativeId);
+    if (!newCoop) return res.status(404).json({ message: "Cooperative not found" });
+
+    if (String(worker.cooperativeId) === String(newCoop._id)) {
+      return res.status(400).json({ message: "You're already a member of this cooperative" });
+    }
+
+    const oldCoop = await Cooperative.findById(worker.cooperativeId);
+    if (oldCoop) {
+      oldCoop.memberWorkerIds = oldCoop.memberWorkerIds.filter((id) => String(id) !== String(worker._id));
+      await oldCoop.save();
+    }
+
+    newCoop.memberWorkerIds.push(worker._id);
+    await newCoop.save();
+
+    worker.cooperativeId = newCoop._id;
+    worker.verified = false;
+    await worker.save();
+
+    res.json({ message: `Moved to ${newCoop.name}`, worker });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.patch("/me/aadhar", protect, authorize("worker"), async (req, res) => {
   try {
     const { aadharNumber } = req.body;
@@ -152,7 +174,7 @@ router.patch("/me/aadhar", protect, authorize("worker"), async (req, res) => {
     if (!worker) return res.status(404).json({ message: "Worker profile not found" });
 
     worker.aadharLast4 = aadharNumber.slice(-4);
-    worker.idVerified = false; // needs fresh admin confirmation
+    worker.idVerified = false;
     await worker.save();
 
     res.json({ message: "Aadhaar submitted for verification", aadharLast4: worker.aadharLast4 });
@@ -161,7 +183,6 @@ router.patch("/me/aadhar", protect, authorize("worker"), async (req, res) => {
   }
 });
 
-// GET /api/workers/me/profile  (worker's own dashboard profile)
 router.get("/me/profile", protect, authorize("worker"), async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.id })
